@@ -1,0 +1,126 @@
+name: Git Checkout Lite
+description: >-
+  Check out a repository with plain git: Node-free composite alternative
+  covering the common actions/checkout inputs.
+author: mrdoodles
+
+branding:
+  icon: download
+  color: blue
+
+inputs:
+  repository:
+    description: Repository name with owner, e.g. `lite-actions/git-checkout`.
+    required: false
+    default: ${{ github.repository }}
+  ref:
+    description: >-
+      Branch, tag, full ref (`refs/heads/main`, `refs/pull/1/merge`) or a 40-
+      character commit SHA. Defaults to the ref that triggered the workflow, or
+      the remote's default branch when checking out another repository.
+    required: false
+    default: ""
+  token:
+    description: >-
+      Token used to fetch. Stored as an `http.<server>/.extraheader` basic auth
+      credential in the checkout's local git config.
+    required: false
+    default: ${{ github.token }}
+  path:
+    description: >-
+      Directory to check out into, relative to `GITHUB_WORKSPACE`. Must stay
+      inside the workspace.
+    required: false
+    default: ""
+  clean:
+    description: >-
+      Run `git clean -ffdx && git reset --hard HEAD` when reusing an existing
+      checkout of the same repository.
+    required: false
+    default: "true"
+  fetch-depth:
+    description: >-
+      Number of commits to fetch. `0` fetches all history and (for an existing
+      shallow checkout) unshallows it.
+    required: false
+    default: "1"
+  fetch-tags:
+    description: Also fetch tags, even when `fetch-depth` is not 0.
+    required: false
+    default: "false"
+  filter:
+    description: >-
+      Partial clone filter, e.g. `blob:none`. Applied to every fetch.
+    required: false
+    default: ""
+  sparse-checkout:
+    description: >-
+      Newline-separated patterns to restrict the working tree to. Empty means a
+      full checkout (and clears sparse-checkout on a reused directory).
+    required: false
+    default: ""
+  sparse-checkout-cone-mode:
+    description: Use cone mode for `sparse-checkout` (directory prefixes only).
+    required: false
+    default: "true"
+  lfs:
+    description: Download Git LFS objects after checkout (needs `git-lfs`).
+    required: false
+    default: "false"
+  submodules:
+    description: "`false`, `true`, or `recursive`."
+    required: false
+    default: "false"
+  set-safe-directory:
+    description: Add the checkout path to the global `safe.directory` list.
+    required: false
+    default: "true"
+  persist-credentials:
+    description: >-
+      Keep the auth header in the local git config so later steps can push.
+      When false it is removed once the checkout completes.
+    required: false
+    default: "true"
+  show-progress:
+    description: Pass `--progress` to fetch and checkout.
+    required: false
+    default: "true"
+  github-server-url:
+    description: Base URL of the git server.
+    required: false
+    default: ${{ github.server_url }}
+
+outputs:
+  ref:
+    description: The fully-qualified ref that was checked out, when there was one.
+    value: ${{ steps.checkout.outputs.ref }}
+  commit:
+    description: The commit SHA at the tip of the checkout.
+    value: ${{ steps.checkout.outputs.commit }}
+  path:
+    description: Absolute path of the checkout.
+    value: ${{ steps.checkout.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - id: checkout
+      shell: bash
+      env:
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_REF: ${{ inputs.ref }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_CLEAN: ${{ inputs.clean }}
+        INPUT_FETCH_DEPTH: ${{ inputs.fetch-depth }}
+        INPUT_FETCH_TAGS: ${{ inputs.fetch-tags }}
+        INPUT_FILTER: ${{ inputs.filter }}
+        INPUT_SPARSE_CHECKOUT: ${{ inputs.sparse-checkout }}
+        INPUT_SPARSE_CHECKOUT_CONE_MODE: ${{ inputs.sparse-checkout-cone-mode }}
+        INPUT_LFS: ${{ inputs.lfs }}
+        INPUT_SUBMODULES: ${{ inputs.submodules }}
+        INPUT_SET_SAFE_DIRECTORY: ${{ inputs.set-safe-directory }}
+        INPUT_PERSIST_CREDENTIALS: ${{ inputs.persist-credentials }}
+        INPUT_SHOW_PROGRESS: ${{ inputs.show-progress }}
+        INPUT_GITHUB_SERVER_URL: ${{ inputs.github-server-url }}
+      run: bash "${GITHUB_ACTION_PATH}/scripts/checkout.sh"

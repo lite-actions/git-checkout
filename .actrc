@@ -1,0 +1,9 @@
+# Defaults for local `act` runs from this repo.
+#
+# The daemon socket is not mounted into the job container: with podman on macOS
+# the host-side socket path does not exist inside the VM, and act fails at
+# container creation trying to bind-mount it. No job here needs Docker-in-Docker.
+--container-daemon-socket -
+
+# Reuse the cached runner image rather than re-checking the registry each run.
+--pull=false
