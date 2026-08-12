@@ -1,0 +1,151 @@
+name: CI
+
+# There is no actions/checkout in this file. Each job fetches the action with a
+# handful of git commands and then uses the action for the real checkout, so CI
+# is also the proof that the action can replace actions/checkout outright.
+#
+# The bootstrap block is the one thing that cannot be shared: a composite action
+# has to already be in the workspace before `uses: ./…` can reach it, and
+# Actions has no YAML anchors. Six lines per job is the price of self-hosting.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bootstrap the action with plain git
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q .action
+          git -C .action remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          # The bare token is masked by the runner; its base64 form is not.
+          basic="$(printf 'x-access-token:%s' "${TOKEN}" | base64 | tr -d '\n')"
+          echo "::add-mask::${basic}"
+          git -C .action config --local "http.${GITHUB_SERVER_URL}/.extraheader" \
+            "AUTHORIZATION: basic ${basic}"
+          git -C .action fetch --depth=1 --no-tags origin "${GITHUB_SHA}"
+          git -C .action checkout -q --detach FETCH_HEAD
+
+      # Straight into the workspace root: the action refuses to delete the
+      # directory it is running from, so the bootstrap copy survives its own
+      # checkout. `tests/test.sh` locks that behaviour down.
+      - name: Check out with the action under test
+        uses: ./.action
+
+      - name: ShellCheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck -x --severity=warning scripts/*.sh tests/*.sh
+
+  test:
+    # macOS ships bash 3.2, which is where the array-under-`set -u` and
+    # `base64 -w0` traps bite; run the suite there too.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Bootstrap the action with plain git
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q .action
+          git -C .action remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          basic="$(printf 'x-access-token:%s' "${TOKEN}" | base64 | tr -d '\n')"
+          echo "::add-mask::${basic}"
+          git -C .action config --local "http.${GITHUB_SERVER_URL}/.extraheader" \
+            "AUTHORIZATION: basic ${basic}"
+          git -C .action fetch --depth=1 --no-tags origin "${GITHUB_SHA}"
+          git -C .action checkout -q --detach FETCH_HEAD
+
+      - name: Check out with the action under test
+        uses: ./.action
+
+      - name: Tests
+        run: bash tests/test.sh
+
+  e2e:
+    # The action driven the way a consumer drives it, against real remotes.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bootstrap the action with plain git
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q .action
+          git -C .action remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          basic="$(printf 'x-access-token:%s' "${TOKEN}" | base64 | tr -d '\n')"
+          echo "::add-mask::${basic}"
+          git -C .action config --local "http.${GITHUB_SERVER_URL}/.extraheader" \
+            "AUTHORIZATION: basic ${basic}"
+          git -C .action fetch --depth=1 --no-tags origin "${GITHUB_SHA}"
+          git -C .action checkout -q --detach FETCH_HEAD
+
+      - name: Check out this repository with itself
+        id: self
+        uses: ./.action
+        with:
+          path: self
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: The checkout is the commit under test, in full
+        run: |
+          set -euo pipefail
+          test "${{ steps.self.outputs.commit }}" = "${GITHUB_SHA}"
+          test "${{ steps.self.outputs.ref }}" = "${GITHUB_REF}"
+          test ! -f self/.git/shallow
+          # The same tree the bootstrap produced, arrived at two different ways.
+          diff -r --exclude=.git .action self
+
+      - name: The suite passes from the checkout the action made
+        run: bash self/tests/test.sh
+
+      - name: Re-checking out over the top is idempotent
+        uses: ./.action
+        with:
+          path: self
+          fetch-depth: 0
+
+      - name: Still clean, still the same commit
+        run: |
+          set -euo pipefail
+          test -z "$(git -C self status --porcelain)"
+          test "$(git -C self rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Another repository, at a tag, three commits deep
+        id: other
+        uses: ./.action
+        with:
+          repository: actions/checkout
+          ref: v4.2.2
+          path: other
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: The ref, the depth and the cleanup were all honoured
+        run: |
+          set -euo pipefail
+          test -f other/action.yml
+          test -f other/.git/shallow
+          # Depth is per parent, so a merge can pull in more than N commits.
+          test "$(git -C other rev-list --count HEAD)" -le 6
+          test "${{ steps.other.outputs.ref }}" = "refs/tags/v4.2.2"
+          test -z "$(git -C other config --local --get-regexp extraheader || true)"

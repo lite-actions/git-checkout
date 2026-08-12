@@ -1,0 +1,43 @@
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-executables-have-shebangs
+
+  # Commit messages must be Conventional Commits — the same rule
+  # conventional-validator enforces on the PR.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v2.1.1
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: []
+
+  # Branch names, from conventional-validator's own hook. Pinned to a release
+  # rather than the moving `v1` so the hook is reproducible; `pre-commit
+  # autoupdate` moves it.
+  - repo: https://github.com/lite-actions/conventional-validator
+    rev: v1.3.2
+    hooks:
+      - id: conventional-branch
+
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: ShellCheck
+        entry: shellcheck -x --severity=warning
+        language: system
+        files: \.sh$
+
+      - id: action-tests
+        name: Action test suite
+        entry: bash tests/test.sh
+        language: system
+        pass_filenames: false
+        files: ^(scripts/|tests/|action\.yml$)
