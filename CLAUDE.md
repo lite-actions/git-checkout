@@ -127,14 +127,18 @@ needs the branch pushed, since it checks itself out from the real origin.
 - Every behaviour change ships with an assertion in `tests/test.sh`; use the
   `assert`/`refute` helpers rather than `[ … ]; check $?` (SC2319).
 
-## Versioning & releasing
+## Versioning & publishing
 
-Releases are cut by `release.yml` (`workflow_dispatch`) — never by hand, and
+Releases are cut by `publish.yml` (`workflow_dispatch`) — never by hand, and
 never through the GitHub web UI:
 
 ```bash
-gh workflow run release.yml --repo lite-actions/git-checkout
+gh workflow run publish.yml --repo lite-actions/git-checkout
 ```
+
+The workflow is named `publish` rather than `release` because "release" is
+overloaded here: `release-notes` generates notes, `rust-release` builds
+binaries, and this cuts and publishes a version. `publish` names the intent.
 
 It computes the version from the commits since the last `vX.Y.Z` tag, tags the
 release, force-moves `@vN`, and publishes the GitHub Release with the generated
