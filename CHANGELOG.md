@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file,
 grouped by push and referenced by short commit SHA.
 
+## 2026-08-20 ([bd4c6b8](https://github.com/lite-actions/git-checkout/commit/bd4c6b8029549693c12a4190decf63ce73e85631))
+
+### Other Changes
+
+- refresh CLAUDE.md after the org transfer ([cffa169](https://github.com/lite-actions/git-checkout/commit/cffa169b80b0b39e71d9174340daa71f8a88b96c))
+
 ## 2026-08-20 ([157f373](https://github.com/lite-actions/git-checkout/commit/157f373734d0c532a1267a605cde7d612c2590be))
 
 ### Other Changes
