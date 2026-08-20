@@ -28,22 +28,22 @@ section honest as the script grows.
   the action itself, so CI doubles as the proof that the action replaces
   `actions/checkout` outright.
 
-- `.github/workflows/conventional-validation.yml` — `mrdoodles/conventional-validator@v1`
-  on PRs (commits, branch name, body), skipped for Dependabot.
 - `.github/workflows/changelog.yml` — on push to main,
-  `mrdoodles/conventional-changelog@v1` then `mrdoodles/release-notes@v1`,
-  committed straight back (this repo is unprotected, so no PR dance).
+  `lite-actions/conventional-changelog@v1` then `lite-actions/release-notes@v1`,
+  landed via an auto-merged PR. `main` requires signed commits, so the commit is
+  made through `lite-actions/signed-commit@v1` rather than by the runner, which
+  has no signing key.
 - `.pre-commit-config.yaml` — Conventional Commits on `commit-msg`, the
-  `conventional-branch` hook from `mrdoodles/conventional-validator`, plus local
-  shellcheck and test-suite hooks.
+  `conventional-branch` hook from `lite-actions/conventional-validator`, plus
+  local shellcheck and test-suite hooks.
 
 The bootstrap **cannot be deduplicated**: `uses: ./…` needs the action in the
 workspace before it can run, Actions has no YAML anchors, and a reusable
 workflow is a separate job with a separate workspace. Expressions are not
-allowed in `uses:` either, so `mrdoodles/git-checkout@${{ github.sha }}` is out.
-Once `v1` is tagged, workflows that do **not** need the commit under test could
-switch to `uses: mrdoodles/git-checkout@v1` and drop the bootstrap entirely; CI
-itself cannot, since it must test the action at the PR's commit.
+allowed in `uses:` either, so `lite-actions/git-checkout@${{ github.sha }}` is
+out. Workflows that do **not** need the commit under test could switch to
+`uses: lite-actions/git-checkout@v1` and drop the bootstrap entirely; CI itself
+cannot, since it must test the action at the PR's commit.
 
 Every one of these workflows checks out at the **workspace root**, because a
 `uses:` step cannot set `working-directory` — a remote action like
@@ -97,7 +97,7 @@ bash tests/test.sh
 shellcheck -x --severity=warning scripts/*.sh tests/*.sh
 
 # Manual run against a real repo:
-GITHUB_WORKSPACE=/tmp/ws INPUT_REPOSITORY=mrdoodles/git-checkout \
+GITHUB_WORKSPACE=/tmp/ws INPUT_REPOSITORY=lite-actions/git-checkout \
   INPUT_FETCH_DEPTH=0 bash scripts/checkout.sh
 ```
 
