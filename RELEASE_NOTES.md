@@ -1,8 +1,6 @@
 # git-checkout
 
-## v1.1.0
+## v1.1.1
 
-### Features
-
-- add changelog and release workflows
+_No user-facing changes since v1.1.0._
 
