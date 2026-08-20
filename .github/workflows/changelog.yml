@@ -1,0 +1,124 @@
+name: Changelog
+
+# On merge to main, log the push's commits to CHANGELOG.md and land the update
+# via an auto-merged PR (main is protected, so direct pushes are rejected).
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      # Stop the changelog PR's own merge from looping.
+      - CHANGELOG.md
+      - RELEASE_NOTES.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changelog
+  cancel-in-progress: false
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      # This repository is git-checkout, so it must not depend on its own
+      # released version. Same bootstrap as ci.yml: fetch the action with plain
+      # git, then use the local copy for the real checkout. Six lines is the
+      # price of not being in our own dependency graph.
+      - name: Bootstrap the action with plain git
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q .action
+          git -C .action remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          # The bare token is masked by the runner; its base64 form is not.
+          basic="$(printf 'x-access-token:%s' "${TOKEN}" | base64 | tr -d '\n')"
+          echo "::add-mask::${basic}"
+          git -C .action config --local "http.${GITHUB_SERVER_URL}/.extraheader" \
+            "AUTHORIZATION: basic ${basic}"
+          git -C .action fetch --depth=1 --no-tags origin "${GITHUB_SHA}"
+          git -C .action checkout -q --detach FETCH_HEAD
+
+      - name: Checkout
+        uses: ./.action
+        with:
+          fetch-depth: 0
+          # release-notes resolves "since the last release" from vX.Y.Z tags,
+          # and git-checkout appends --no-tags unless this is set, even at
+          # fetch-depth 0. Without it the notes version up from 0.0.0.
+          fetch-tags: true
+          # A user PAT so the branch push / PR creation act as a real user and
+          # therefore trigger the required checks (GITHUB_TOKEN would not).
+          # Falls back to github.token before the secret is configured, so the
+          # job checks out and then gracefully skips instead of erroring.
+          token: ${{ secrets.CHANGELOG_BOT_TOKEN || github.token }}
+
+      - name: Update changelog
+        id: changelog
+        uses: lite-actions/conventional-changelog@v1
+
+      # Regenerate RELEASE_NOTES.md (BREAKING/feat/fix since the last release).
+      - name: Generate release notes
+        if: steps.changelog.outputs.changed == 'true'
+        uses: lite-actions/release-notes@v1
+
+      - name: Open, approve and auto-merge changelog PR
+        if: steps.changelog.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+          APPROVE_TOKEN: ${{ secrets.CHANGELOG_APPROVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ] || [ -z "${APPROVE_TOKEN:-}" ]; then
+            echo "::warning::CHANGELOG_BOT_TOKEN / CHANGELOG_APPROVE_TOKEN not set; skipping changelog PR."
+            exit 0
+          fi
+          branch="chore/changelog-${GITHUB_RUN_ID}"
+          head_sha="$(git rev-parse HEAD)"
+
+          # Branch off the current tip, then commit through the API rather than
+          # with git. main requires signed commits, and a runner has no signing
+          # key - a `git commit` here is unsigned, which blocks the PR outright
+          # whatever merge strategy is chosen. Commits created via
+          # createCommitOnBranch are signed by GitHub, and unlike the REST
+          # contents endpoint it takes both files in a single commit.
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/heads/${branch}" -f sha="${head_sha}" >/dev/null
+
+          jq -n \
+            --arg repo "${GITHUB_REPOSITORY}" \
+            --arg branch "${branch}" \
+            --arg oid "${head_sha}" \
+            --arg changelog "$(base64 -w0 CHANGELOG.md)" \
+            --arg notes "$(base64 -w0 RELEASE_NOTES.md)" \
+            '{query:"mutation($input:CreateCommitOnBranchInput!){createCommitOnBranch(input:$input){commit{oid}}}",
+              variables:{input:{
+                branch:{repositoryNameWithOwner:$repo,branchName:$branch},
+                expectedHeadOid:$oid,
+                message:{headline:"docs(changelog): update changelog and release notes"},
+                fileChanges:{additions:[
+                  {path:"CHANGELOG.md",contents:$changelog},
+                  {path:"RELEASE_NOTES.md",contents:$notes}]}}}}' \
+            | gh api graphql --input - >/dev/null
+
+          gh pr create --base main --head "${branch}" \
+            --title "docs(changelog): update changelog and release notes" \
+            --body "Automated changelog + release-notes update from the latest merge to \`main\`."
+
+          # Approve with a second identity: a PR author/last-pusher cannot
+          # self-approve, and GITHUB_TOKEN cannot approve at all.
+          GH_TOKEN="${APPROVE_TOKEN}" gh pr review "${branch}" --approve \
+            --body "Automated approval of changelog update."
+
+          gh pr merge "${branch}" --auto --squash --delete-branch
+
+      - name: Clean up on failure
+        if: failure() && steps.changelog.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+        run: |
+          branch="chore/changelog-${GITHUB_RUN_ID}"
+          gh pr close "${branch}" --delete-branch 2>/dev/null || true
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" 2>/dev/null || true
+          echo "Cleaned up ${branch} (if it existed)."

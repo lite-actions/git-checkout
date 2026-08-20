@@ -1,0 +1,84 @@
+name: Release
+
+# Manual release for the action: generate notes from BREAKING/feat/fix commits
+# since the last release, tag vX.Y.Z, move the vN major tag, and publish a
+# GitHub Release. Tags are not branch-protected, so no PR/approval dance needed.
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Base ref/commit for the notes (default: last release tag)."
+        required: false
+        default: ""
+      to:
+        description: "Head ref/commit for the notes (default: HEAD)."
+        required: false
+        default: ""
+      version:
+        description: "Explicit version, e.g. 1.2.0 (default: computed from commits)."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # This repository is git-checkout, so it must not depend on its own
+      # released version. Same bootstrap as ci.yml: fetch the action with plain
+      # git, then use the local copy for the real checkout. Six lines is the
+      # price of not being in our own dependency graph.
+      - name: Bootstrap the action with plain git
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q .action
+          git -C .action remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          # The bare token is masked by the runner; its base64 form is not.
+          basic="$(printf 'x-access-token:%s' "${TOKEN}" | base64 | tr -d '\n')"
+          echo "::add-mask::${basic}"
+          git -C .action config --local "http.${GITHUB_SERVER_URL}/.extraheader" \
+            "AUTHORIZATION: basic ${basic}"
+          git -C .action fetch --depth=1 --no-tags origin "${GITHUB_SHA}"
+          git -C .action checkout -q --detach FETCH_HEAD
+
+      - name: Checkout
+        uses: ./.action
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Generate release notes
+        id: notes
+        uses: lite-actions/release-notes@v1
+        with:
+          from: ${{ github.event.inputs.from }}
+          to: ${{ github.event.inputs.to }}
+          version: ${{ github.event.inputs.version }}
+
+      - name: Tag, move major tag, and publish release
+        if: steps.notes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.notes.outputs.version }}
+          NOTES_FILE: ${{ steps.notes.outputs.file }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tag="v${VERSION}"
+          major="v${VERSION%%.*}"
+          git tag -a "${tag}" -m "Release ${VERSION}"
+          # Force-move the major tag so consumers on @vN get this release.
+          git tag -f -a "${major}" -m "${major} -> ${VERSION}"
+          git push origin "${tag}"
+          git push origin -f "${major}"
+          # The generated notes file is the GitHub Release body.
+          gh release create "${tag}" --title "${VERSION}" --notes-file "${NOTES_FILE}"
