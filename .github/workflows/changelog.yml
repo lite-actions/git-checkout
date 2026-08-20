@@ -63,45 +63,39 @@ jobs:
         if: steps.changelog.outputs.changed == 'true'
         uses: lite-actions/release-notes@v1
 
+      - name: Name the branch
+        id: branch
+        if: steps.changelog.outputs.changed == 'true'
+        run: echo "branch=chore/changelog-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      # A runner has no signing key, and main requires signed commits. The
+      # action makes the commit through GitHub's API, which signs it.
+      - name: Commit the changelog
+        if: steps.changelog.outputs.changed == 'true'
+        uses: lite-actions/signed-commit@v1
+        with:
+          branch: ${{ steps.branch.outputs.branch }}
+          create-branch: true
+          base-sha: ${{ github.sha }}
+          message: "docs(changelog): update changelog and release notes"
+          files: |
+            CHANGELOG.md
+            RELEASE_NOTES.md
+          token: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+
       - name: Open, approve and auto-merge changelog PR
         if: steps.changelog.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
           APPROVE_TOKEN: ${{ secrets.CHANGELOG_APPROVE_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ] || [ -z "${APPROVE_TOKEN:-}" ]; then
             echo "::warning::CHANGELOG_BOT_TOKEN / CHANGELOG_APPROVE_TOKEN not set; skipping changelog PR."
             exit 0
           fi
-          branch="chore/changelog-${GITHUB_RUN_ID}"
-          head_sha="$(git rev-parse HEAD)"
-
-          # Branch off the current tip, then commit through the API rather than
-          # with git. main requires signed commits, and a runner has no signing
-          # key - a `git commit` here is unsigned, which blocks the PR outright
-          # whatever merge strategy is chosen. Commits created via
-          # createCommitOnBranch are signed by GitHub, and unlike the REST
-          # contents endpoint it takes both files in a single commit.
-          gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
-            -f ref="refs/heads/${branch}" -f sha="${head_sha}" >/dev/null
-
-          jq -n \
-            --arg repo "${GITHUB_REPOSITORY}" \
-            --arg branch "${branch}" \
-            --arg oid "${head_sha}" \
-            --arg changelog "$(base64 -w0 CHANGELOG.md)" \
-            --arg notes "$(base64 -w0 RELEASE_NOTES.md)" \
-            '{query:"mutation($input:CreateCommitOnBranchInput!){createCommitOnBranch(input:$input){commit{oid}}}",
-              variables:{input:{
-                branch:{repositoryNameWithOwner:$repo,branchName:$branch},
-                expectedHeadOid:$oid,
-                message:{headline:"docs(changelog): update changelog and release notes"},
-                fileChanges:{additions:[
-                  {path:"CHANGELOG.md",contents:$changelog},
-                  {path:"RELEASE_NOTES.md",contents:$notes}]}}}}' \
-            | gh api graphql --input - >/dev/null
-
+          branch="${BRANCH}"
           gh pr create --base main --head "${branch}" \
             --title "docs(changelog): update changelog and release notes" \
             --body "Automated changelog + release-notes update from the latest merge to \`main\`."
