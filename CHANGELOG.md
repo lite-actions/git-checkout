@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file,
 grouped by push and referenced by short commit SHA.
 
+## 2026-08-20 ([157f373](https://github.com/lite-actions/git-checkout/commit/157f373734d0c532a1267a605cde7d612c2590be))
+
+### Other Changes
+
+- use the signed-commit action instead of an inline API call ([bec3de9](https://github.com/lite-actions/git-checkout/commit/bec3de945d0bee4309f7f181b3a6d440119d85f4))
+
 ## 2026-08-20 ([eb3a66a](https://github.com/lite-actions/git-checkout/commit/eb3a66a79cf0a7c9a6661e811f9c9804a89bf937))
 
 ### Other Changes
