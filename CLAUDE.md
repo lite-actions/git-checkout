@@ -127,10 +127,26 @@ needs the branch pushed, since it checks itself out from the real origin.
 - Every behaviour change ships with an assertion in `tests/test.sh`; use the
   `assert`/`refute` helpers rather than `[ … ]; check $?` (SC2319).
 
-## Versioning & releasing (release manually — no release workflow yet)
+## Versioning & releasing
 
-`git tag -a vX.Y.Z`, force-move the major tag (`git tag -f -a v1`), push both,
-`gh release create`. `@v1` is the moving major tag consumers use.
+Releases are cut by `release.yml` (`workflow_dispatch`) — never by hand, and
+never through the GitHub web UI:
+
+```bash
+gh workflow run release.yml --repo lite-actions/git-checkout
+```
+
+It computes the version from the commits since the last `vX.Y.Z` tag, tags the
+release, force-moves `@vN`, and publishes the GitHub Release with the generated
+notes as its body. `@vN` is the moving major tag consumers use.
+
+**Never create a release through the web UI.** The "publish to the Marketplace"
+checkbox is required only for an action's *first* publish; once a listing
+exists, releases cut by the workflow appear on it automatically — verified
+2026-08-20 on `git-checkout`, where `v1.1.0` reached the listing with nothing
+ticked. Using the UI afterwards is what produced the `v1.12` and `1.3.5` tags,
+and left `@v1` pointing at an old commit three times. The workflow types
+nothing, so it cannot mistype.
 
 ## Conventions
 
