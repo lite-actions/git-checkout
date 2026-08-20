@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file,
 grouped by push and referenced by short commit SHA.
 
+## 2026-08-20 ([eb3a66a](https://github.com/lite-actions/git-checkout/commit/eb3a66a79cf0a7c9a6661e811f9c9804a89bf937))
+
+### Other Changes
+
+- releases are cut by release.yml, never the web UI ([aa887dc](https://github.com/lite-actions/git-checkout/commit/aa887dc98780171b3b256f379eb272ceb894f21a))
+
 ## 2026-08-20 ([1a4cd99](https://github.com/lite-actions/git-checkout/commit/1a4cd99a15914ffde6e3da53681840c1e83aa502))
 
 ### Features
