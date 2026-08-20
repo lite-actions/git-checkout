@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file,
 grouped by push and referenced by short commit SHA.
 
+## 2026-08-20 ([e7e7f9f](https://github.com/lite-actions/git-checkout/commit/e7e7f9f1d5d3a392cc5e71ea34051ca62c80dcae))
+
+### Other Changes
+
+- rename release.yml to publish.yml ([71997a1](https://github.com/lite-actions/git-checkout/commit/71997a14a204bc0028066f8fd62e4ddf58096dcb))
+
 ## 2026-08-20 ([bd4c6b8](https://github.com/lite-actions/git-checkout/commit/bd4c6b8029549693c12a4190decf63ce73e85631))
 
 ### Other Changes
