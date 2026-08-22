@@ -154,6 +154,15 @@ nothing, so it cannot mistype.
 
 ## Conventions
 
+- **Never use `pull_request_target`.** It runs the *base* repository's workflow
+  with secrets and a write token against fork-controlled code — the classic way
+  an action repository is compromised. `pull_request` is correct: a fork PR runs
+  in the fork's context with a read-only token and no access to secrets, so
+  untrusted code still runs but can neither exfiltrate nor write. This is the
+  single most important control in these repos and the cheapest to lose by
+  accident, because `pull_request_target` looks like a convenient way to get a
+  token.
+
 - Public, **unprotected** repo — push docs/fixes to `main` directly; workflow-
   file changes need a `workflow`-scoped token.
 - Conventional Commits for messages, with the body as a **single unwrapped
