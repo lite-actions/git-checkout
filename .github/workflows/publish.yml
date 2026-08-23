@@ -1,6 +1,6 @@
-name: Release
+name: Publish
 
-# Manual release for the action: generate notes from BREAKING/feat/fix commits
+# Manual publish for the action: generate notes from BREAKING/feat/fix commits
 # since the last release, tag vX.Y.Z, move the vN major tag, and publish a
 # GitHub Release. Tags are not branch-protected, so no PR/approval dance needed.
 on:
@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release
+  group: publish
   cancel-in-progress: false
 
 jobs:
