@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Conventional prefix so the bump commits read cleanly in CHANGELOG.md.
+    # Dependabot's branch names (dependabot/github_actions/... , with
+    # underscores and extra path segments) cannot match the Conventional Branch
+    # spec however branch-types is configured, so conventional validation skips
+    # the dependabot[bot] actor and reports the required check as passing.
+    commit-message:
+      prefix: "chore(deps)"
