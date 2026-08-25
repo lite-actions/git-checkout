@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file,
 grouped by push and referenced by short commit SHA.
 
+## 2026-08-25 ([e44c346](https://github.com/lite-actions/git-checkout/commit/e44c3465e9a3e2a60c056c5fc742c0ce1453e495))
+
+### Other Changes
+
+- add conventional validation ([88070d5](https://github.com/lite-actions/git-checkout/commit/88070d58950a20e5072b31b9e781a2eee8d3fea1))
+
 ## 2026-08-25 ([4fe3b3f](https://github.com/lite-actions/git-checkout/commit/4fe3b3f9721fff47c14c8fbc35779f2b2b45dc04))
 
 ### Other Changes
