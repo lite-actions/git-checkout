@@ -48,7 +48,7 @@ jobs:
 
       - name: ShellCheck
         run: |
-          # shellcheck ships on the ubuntu runner images, so there is nothing
+          # ShellCheck ships on the ubuntu runner images, so there is nothing
           # to install. The apt-get that used to be here could hang
           # indefinitely on an unresponsive mirror, and lint is a required
           # check, so that blocks the PR rather than failing it.

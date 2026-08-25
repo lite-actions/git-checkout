@@ -1,0 +1,59 @@
+name: Conventional Validation
+
+# Pull requests only. Validation exists to gate a pull request; dispatched by
+# hand there is nothing to gate, and an empty base-ref checks only HEAD - a
+# commit that has already merged, where a failure informs nobody.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      # There is no actions/checkout in this repository. Same bootstrap as
+      # ci.yml: fetch the action with plain git, then use the local copy for the
+      # real checkout. Six lines is the price of not being in our own dependency
+      # graph, and a composite action has to be in the workspace before
+      # `uses: ./…` can reach it.
+      - name: Bootstrap the action with plain git
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q .action
+          git -C .action remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          # The bare token is masked by the runner; its base64 form is not.
+          basic="$(printf 'x-access-token:%s' "${TOKEN}" | base64 | tr -d '\n')"
+          echo "::add-mask::${basic}"
+          git -C .action config --local "http.${GITHUB_SERVER_URL}/.extraheader" \
+            "AUTHORIZATION: basic ${basic}"
+          git -C .action fetch --depth=1 --no-tags origin "${GITHUB_SHA}"
+          git -C .action checkout -q --detach FETCH_HEAD
+
+      # fetch-depth 0 so the commit range is resolvable; the validator walks
+      # every commit on the pull request, not just the tip.
+      - name: Check out with the action under test
+        uses: ./.action
+        with:
+          fetch-depth: 0
+
+      # Dependabot's branch names (dependabot/github_actions/…) are not one of
+      # the accepted branch types, and both its branch and commit naming are
+      # bot-controlled. Skipping keeps a required check reporting green rather
+      # than failing on naming nobody here chose.
+      #
+      # actions-workflows/conventional-validation has this skip built in, but
+      # this repository calls the validator directly: `validate` is a required
+      # check, and git-checkout's required checks stay out of the shared
+      # repository so a bad release there cannot block this repo's own fix.
+      - name: Skip for Dependabot
+        if: github.actor == 'dependabot[bot]'
+        run: echo "Dependabot PR — conventional validation skipped."
+
+      - name: Validate conventional commits & branch
+        if: github.actor != 'dependabot[bot]'
+        uses: lite-actions/conventional-validator@v1
