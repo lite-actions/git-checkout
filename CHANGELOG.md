@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file,
 grouped by push and referenced by short commit SHA.
 
+## 2026-08-25 ([4fe3b3f](https://github.com/lite-actions/git-checkout/commit/4fe3b3f9721fff47c14c8fbc35779f2b2b45dc04))
+
+### Other Changes
+
+- remove the per-repo Claude skills ([cd0df31](https://github.com/lite-actions/git-checkout/commit/cd0df3189164b5f4beee866a9e04397ae35d032c))
+
 ## 2026-08-23 ([c5567bb](https://github.com/lite-actions/git-checkout/commit/c5567bb726a6d63210abae87727aa081f76894f7))
 
 ### Other Changes
